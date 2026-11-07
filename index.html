@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sudoku: Neon Cyberpunk vs Punk Rock</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Canvas Confetti Library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Black+Ops+One&family=Orbitron:wght@700;900&family=Rajdhani:wght@600;700;800&family=Russo+One&display=swap" rel="stylesheet">
+
+  <style>
+    /* BASE THEME: CYBERPUNK NEON */
+    :root {
+      --bg-gradient: radial-gradient(circle at top left, #050b14, #020617);
+      --panel-bg: rgba(10, 16, 30, 0.85);
+      --panel-border: rgba(56, 189, 248, 0.25);
+      --font-heading: 'Orbitron', sans-serif;
+      --font-num: 'Rajdhani', sans-serif;
+      --primary-neon: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.6);
+      --accent-neon: #ec4899;
+      --grid-border: rgba(99, 102, 241, 0.4);
+      --cell-bg: rgba(15, 23, 42, 0.9);
+      --cell-selected: rgba(14, 165, 233, 0.35);
+      --cell-related: rgba(30, 41, 59, 0.85);
+      --cell-same: rgba(99, 102, 241, 0.45);
+      --text-given: #f8fafc;
+      --text-user: #38bdf8;
+      --btn-bg: rgba(30, 41, 59, 0.8);
+      --btn-border: rgba(51, 65, 85, 0.8);
+      --btn-hover-border: #38bdf8;
+      --numpad-color: #7dd3fc;
+    }
+
+    /* THEME 2: PUNK ROCK NEON */
+    body.theme-punk {
+      --bg-gradient: radial-gradient(circle at center, #180018, #050008);
+      --panel-bg: rgba(24, 6, 30, 0.92);
+      --panel-border: rgba(244, 63, 94, 0.5);
+      --font-heading: 'Black Ops One', cursive;
+      --font-num: 'Russo One', 'Bungee', sans-serif;
+      --primary-neon: #a3e635;
+      --primary-glow: rgba(163, 230, 53, 0.75);
+      --accent-neon: #f43f5e;
+      --grid-border: rgba(244, 63, 94, 0.7);
+      --cell-bg: rgba(28, 8, 35, 0.95);
+      --cell-selected: rgba(244, 63, 94, 0.45);
+      --cell-related: rgba(50, 12, 55, 0.85);
+      --cell-same: rgba(163, 230, 53, 0.4);
+      --text-given: #facc15;
+      --text-user: #4ade80;
+      --btn-bg: rgba(40, 10, 45, 0.95);
+      --btn-border: rgba(244, 63, 94, 0.5);
+      --btn-hover-border: #a3e635;
+      --numpad-color: #f43f5e;
+    }
+
+    * {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: #f8fafc;
+      min-height: 100vh;
+      transition: background 0.4s ease;
+    }
+
+    .glass-panel {
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+      transition: all 0.3s ease;
+    }
+
+    .font-title {
+      font-family: var(--font-heading);
+    }
+
+    .sudoku-cell {
+      font-family: var(--font-num);
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      background-color: var(--cell-bg);
+    }
+
+    .border-block-r { border-right: 2px solid var(--grid-border) !important; }
+    .border-block-b { border-bottom: 2px solid var(--grid-border) !important; }
+
+    .cell-selected {
+      background-color: var(--cell-selected) !important;
+      box-shadow: inset 0 0 14px var(--primary-glow);
+      transform: scale(1.03);
+      z-index: 10;
+    }
+
+    .cell-related {
+      background-color: var(--cell-related) !important;
+    }
+
+    .cell-same-number {
+      background-color: var(--cell-same) !important;
+      color: var(--primary-neon) !important;
+      font-weight: 900;
+      text-shadow: 0 0 10px var(--primary-glow);
+    }
+
+    .cell-given {
+      color: var(--text-given);
+      font-weight: 900;
+    }
+
+    .cell-user {
+      color: var(--text-user);
+      font-weight: 800;
+      text-shadow: 0 0 8px var(--primary-glow);
+    }
+
+    .cell-error {
+      background-color: rgba(239, 68, 68, 0.4) !important;
+      color: #fca5a5 !important;
+      animation: shake 0.35s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-4px); }
+      40%, 80% { transform: translateX(4px); }
+    }
+
+    /* Rascunhos / Notas */
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      width: 100%;
+      height: 100%;
+      font-size: 11px;
+      line-height: 1;
+      color: rgba(255, 255, 255, 0.7);
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+    }
+    .note-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Botões */
+    .btn-glow {
+      background-color: var(--btn-bg);
+      border-color: var(--btn-border);
+      transition: all 0.2s ease;
+    }
+    .btn-glow:hover {
+      border-color: var(--btn-hover-border);
+      box-shadow: 0 0 14px var(--primary-glow);
+      transform: translateY(-2px);
+    }
+    .btn-active {
+      background-color: var(--primary-glow) !important;
+      border-color: var(--primary-neon) !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+
+    .num-btn {
+      font-family: var(--font-num);
+      color: var(--numpad-color);
+    }
+
+    .theme-tab-active {
+      background: var(--primary-glow);
+      color: #ffffff;
+      border-color: var(--primary-neon);
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center p-3 sm:p-6 min-h-screen">
+
+  <div class="glass-panel w-full max-w-lg sm:max-w-xl rounded-3xl p-4 sm:p-6 flex flex-col gap-4 relative overflow-hidden">
+    
+    <!-- Header com Seletor de Tema -->
+    <div class="flex items-center justify-between border-b border-slate-700/50 pb-3">
+      <div>
+        <h1 id="app-title" class="font-title text-lg sm:text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-indigo-300 to-pink-500 tracking-wider">CYBERPUNK NEON</h1>
+        <p class="text-[10px] sm:text-xs text-slate-400 uppercase tracking-widest font-semibold">Seletor de Estilo Visual</p>
+      </div>
+
+      <div class="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+        <button id="theme-cyber-btn" class="px-3 py-1.5 rounded-lg transition-all theme-tab-active">Cyber</button>
+        <button id="theme-punk-btn" class="px-3 py-1.5 rounded-lg transition-all text-slate-400 hover:text-pink-400">Punk</button>
+      </div>
+    </div>
+
+    <!-- Barra de Status -->
+    <div class="grid grid-cols-4 gap-2 bg-slate-950/70 p-3 rounded-2xl border border-slate-800 text-xs sm:text-sm">
+      <div class="flex flex-col items-start justify-center">
+        <span class="text-slate-400 text-[9px] uppercase font-semibold tracking-wider">Nível</span>
+        <select id="difficulty-select" class="bg-transparent text-sky-400 font-bold focus:outline-none cursor-pointer text-xs">
+          <option value="easy" class="bg-slate-900 text-slate-200">Fácil</option>
+          <option value="medium" selected class="bg-slate-900 text-slate-200">Médio</option>
+          <option value="hard" class="bg-slate-900 text-slate-200">Difícil</option>
+          <option value="expert" class="bg-slate-900 text-slate-200">Expert</option>
+        </select>
+      </div>
+
+      <div class="flex flex-col items-center justify-center border-x border-slate-800">
+        <span class="text-slate-400 text-[9px] uppercase font-semibold tracking-wider">Erros</span>
+        <span id="mistakes-counter" class="font-bold text-rose-400">0 / 3</span>
+      </div>
+
+      <div class="flex flex-col items-center justify-center border-r border-slate-800">
+        <span class="text-slate-400 text-[9px] uppercase font-semibold tracking-wider">Tempo</span>
+        <div class="flex items-center gap-1 font-mono font-bold text-emerald-400">
+          <span id="timer-display">00:00</span>
+          <button id="pause-btn" class="text-slate-400 hover:text-emerald-400 transition-colors ml-1">
+            <i class="fa-solid fa-pause text-xs"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end">
+        <button id="sound-btn" class="w-8 h-8 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-sky-400 flex items-center justify-center transition-all">
+          <i class="fa-solid fa-volume-high text-xs"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabuleiro 9x9 -->
+    <div class="relative w-full aspect-square bg-slate-950/90 rounded-2xl border-2 border-indigo-900/60 p-1 shadow-2xl overflow-hidden">
+      
+      <div id="pause-overlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-30 flex flex-col items-center justify-center gap-3 hidden">
+        <i class="fa-solid fa-circle-pause text-5xl text-sky-400 animate-pulse"></i>
+        <span class="text-lg font-bold text-slate-200 tracking-wider font-title">PAUSADO</span>
+        <button id="resume-btn" class="px-6 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm transition-all btn-glow flex items-center gap-2">
+          <i class="fa-solid fa-play"></i> Continuar
+        </button>
+      </div>
+
+      <div id="sudoku-grid" class="grid grid-cols-9 grid-rows-9 w-full h-full gap-[1px] bg-slate-800/60 rounded-xl overflow-hidden"></div>
+    </div>
+
+    <!-- Barra de Ferramentas -->
+    <div class="grid grid-cols-5 gap-1.5 sm:gap-2">
+      <button id="notes-btn" class="flex flex-col items-center justify-center p-2 rounded-xl border text-slate-300 transition-all btn-glow">
+        <i class="fa-solid fa-pencil text-sm mb-1"></i>
+        <span class="text-[9px] sm:text-[10px] font-semibold">Notas</span>
+      </button>
+
+      <button id="erase-btn" class="flex flex-col items-center justify-center p-2 rounded-xl border text-slate-300 transition-all btn-glow">
+        <i class="fa-solid fa-eraser text-sm mb-1"></i>
+        <span class="text-[9px] sm:text-[10px] font-semibold">Apagar</span>
+      </button>
+
+      <button id="hint-btn" class="flex flex-col items-center justify-center p-2 rounded-xl border text-slate-300 transition-all btn-glow relative">
+        <i class="fa-solid fa-lightbulb text-sm mb-1"></i>
+        <span class="text-[9px] sm:text-[10px] font-semibold">Dica</span>
+        <span id="hint-count" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">3</span>
+      </button>
+
+      <button id="restart-btn" class="flex flex-col items-center justify-center p-2 rounded-xl border text-slate-300 transition-all btn-glow">
+        <i class="fa-solid fa-rotate-left text-sm mb-1"></i>
+        <span class="text-[9px] sm:text-[10px] font-semibold">Reiniciar</span>
+      </button>
+
+      <button id="new-game-btn" class="flex flex-col items-center justify-center p-2 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 text-white border border-indigo-400/30 transition-all btn-glow shadow-lg">
+        <i class="fa-solid fa-plus text-sm mb-1"></i>
+        <span class="text-[9px] sm:text-[10px] font-bold">Novo</span>
+      </button>
+    </div>
+
+    <!-- Teclado Numérico Virtual -->
+    <div class="grid grid-cols-9 gap-1 sm:gap-1.5 mt-1">
+      <button class="num-btn h-11 rounded-xl bg-slate-900/90 border border-slate-700/70 text-xl font-black hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition-all shadow-md" data-value="1">1</button>
+      <button class="num-btn h-11 rounded-xl bg-slate-900/90 border border-slate-700/70 text-xl font-black hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition-all shadow-md" data-value="2">2</button>
+      <button class="num-btn h-11 rounded-xl bg-slate-900/90 border border-slate-700/70 text-xl font-black hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition-all shadow-md" data-value="3">3</button>
+      <button class="num-btn h-11 rounded-xl bg-slate-900/90 border border-slate-700/70 text-xl font-black hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition-all shadow-md" data-value="4">4</button>
+      <button class="num-btn h-11 rounded-xl bg-slate-900/90 border border-slate-700/70 text-xl font-black hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition-all shadow-md" data-value="5">5</button>
+      <button class="num-btn h-11 rounded-xl bg-slate-900/90 border border-slate-700/70 text-xl font-black hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition-all shadow-md" data-value="6">6</button>
+      <button class="num-btn h-11 rounded-xl bg-slate-900/90 border border-slate-700/70 text-xl font-black hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition-all shadow-md" data-value="7">7</button>
+      <button class="num-btn h-11 rounded-xl bg-slate-900/90 border border-slate-700/70 text-xl font-black hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition-all shadow-md" data-value="8">8</button>
+      <button class="num-btn h-11 rounded-xl bg-slate-900/90 border border-slate-700/70 text-xl font-black hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition-all shadow-md" data-value="9">9</button>
+    </div>
+
+  </div>
+
+  <!-- Modal de Vitória -->
+  <div id="victory-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md hidden">
+    <div class="glass-panel max-w-sm w-full rounded-3xl p-6 text-center border-2 border-emerald-500/40 shadow-2xl transform scale-95 transition-all">
+      <div class="w-16 h-16 bg-emerald-500/20 border border-emerald-400/40 rounded-2xl flex items-center justify-center text-emerald-400 text-3xl mx-auto mb-4 animate-bounce">
+        <i class="fa-solid fa-trophy"></i>
+      </div>
+      <h2 class="text-2xl font-black text-white tracking-wide mb-1 font-title">VITÓRIA!</h2>
+      <p class="text-slate-300 text-xs mb-4">Completou o Sudoku com maestria!</p>
+
+      <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 mb-5 text-xs text-slate-300 flex justify-around">
+        <div>
+          <span class="block text-slate-500 text-[9px] uppercase font-bold">Tempo</span>
+          <span id="win-time" class="font-mono text-emerald-400 font-bold text-sm">00:00</span>
+        </div>
+        <div class="border-x border-slate-800 px-4">
+          <span class="block text-slate-500 text-[9px] uppercase font-bold">Nível</span>
+          <span id="win-diff" class="font-bold text-sky-300 text-sm">Médio</span>
+        </div>
+        <div>
+          <span class="block text-slate-500 text-[9px] uppercase font-bold">Erros</span>
+          <span id="win-mistakes" class="font-bold text-rose-400 text-sm">0/3</span>
+        </div>
+      </div>
+
+      <button id="modal-new-game-btn" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold tracking-wide shadow-lg hover:brightness-110 active:scale-98 transition-all btn-glow font-title">
+        Jogar Novamente
+      </button>
+    </div>
+  </div>
+
+  <!-- Lógica de Áudio e Jogo -->
+  <script>
+    class SoundEffects {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+
+      playTone(freq, type = 'sine', duration = 0.1, gainValue = 0.1) {
+        if (this.muted) return;
+        this.init();
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(gainValue, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+      }
+
+      click() { this.playTone(600, 'sine', 0.05, 0.08); }
+      select() { this.playTone(800, 'sine', 0.04, 0.05); }
+      fill() { this.playTone(523.25, 'triangle', 0.12, 0.12); }
+      erase() { this.playTone(300, 'sawtooth', 0.08, 0.06); }
+      error() {
+        this.playTone(180, 'sawtooth', 0.2, 0.2);
+        setTimeout(() => this.playTone(140, 'sawtooth', 0.25, 0.2), 80);
+      }
+      hint() {
+        this.playTone(587.33, 'sine', 0.1, 0.1);
+        setTimeout(() => this.playTone(880, 'sine', 0.15, 0.1), 100);
+      }
+      win() {
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((n, i) => {
+          setTimeout(() => this.playTone(n, 'triangle', 0.25, 0.15), i * 120);
+        });
+      }
+    }
+
+    const sound = new SoundEffects();
+
+    class SudokuGame {
+      constructor() {
+        this.grid = Array(81).fill(0);
+        this.solution = Array(81).fill(0);
+        this.initialGrid = Array(81).fill(0);
+        this.notes = Array(81).fill().map(() => new Set());
+        this.isNotesMode = false;
+
+        this.selectedCell = null;
+        this.difficulty = 'medium';
+        this.mistakes = 0;
+        this.maxMistakes = 3;
+        this.hintsLeft = 3;
+        this.timer = 0;
+        this.timerInterval = null;
+        this.isPaused = false;
+        this.isGameOver = false;
+
+        this.gridElement = document.getElementById('sudoku-grid');
+        this.timerDisplay = document.getElementById('timer-display');
+        this.mistakesDisplay = document.getElementById('mistakes-counter');
+        this.difficultySelect = document.getElementById('difficulty-select');
+        this.hintCountDisplay = document.getElementById('hint-count');
+        this.pauseOverlay = document.getElementById('pause-overlay');
+        this.victoryModal = document.getElementById('victory-modal');
+
+        this.initDOM();
+        this.bindEvents();
+        this.startNewGame();
+      }
+
+      initDOM() {
+        this.gridElement.innerHTML = '';
+        for (let i = 0; i < 81; i++) {
+          const row = Math.floor(i / 9);
+          const col = i % 9;
+
+          const cell = document.createElement('div');
+          cell.className = `sudoku-cell flex items-center justify-center font-bold text-lg sm:text-2xl cursor-pointer relative`;
+          cell.dataset.index = i;
+
+          if ((col + 1) % 3 === 0 && col < 8) cell.classList.add('border-block-r');
+          if ((row + 1) % 3 === 0 && row < 8) cell.classList.add('border-block-b');
+
+          cell.addEventListener('click', () => this.selectCell(i));
+          this.gridElement.appendChild(cell);
+        }
+      }
+
+      bindEvents() {
+        const cyberBtn = document.getElementById('theme-cyber-btn');
+        const punkBtn = document.getElementById('theme-punk-btn');
+        const titleElem = document.getElementById('app-title');
+
+        cyberBtn.addEventListener('click', () => {
+          document.body.classList.remove('theme-punk');
+          cyberBtn.classList.add('theme-tab-active');
+          cyberBtn.classList.remove('text-slate-400');
+          punkBtn.classList.remove('theme-tab-active');
+          punkBtn.classList.add('text-slate-400');
+          titleElem.textContent = 'CYBERPUNK NEON';
+          sound.select();
+        });
+
+        punkBtn.addEventListener('click', () => {
+          document.body.classList.add('theme-punk');
+          punkBtn.classList.add('theme-tab-active');
+          punkBtn.classList.remove('text-slate-400');
+          cyberBtn.classList.remove('theme-tab-active');
+          cyberBtn.classList.add('text-slate-400');
+          titleElem.textContent = 'PUNK ROCK NEON';
+          sound.select();
+        });
+
+        document.querySelectorAll('.num-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const val = parseInt(btn.dataset.value);
+            this.handleInput(val);
+          });
+        });
+
+        const notesBtn = document.getElementById('notes-btn');
+        notesBtn.addEventListener('click', () => {
+          this.isNotesMode = !this.isNotesMode;
+          if (this.isNotesMode) {
+            notesBtn.classList.add('btn-active');
+          } else {
+            notesBtn.classList.remove('btn-active');
+          }
+          sound.select();
+        });
+
+        document.getElementById('erase-btn').addEventListener('click', () => this.eraseCell());
+        document.getElementById('hint-btn').addEventListener('click', () => this.giveHint());
+        document.getElementById('restart-btn').addEventListener('click', () => this.restartCurrentGame());
+        document.getElementById('new-game-btn').addEventListener('click', () => this.startNewGame());
+        document.getElementById('modal-new-game-btn').addEventListener('click', () => {
+          this.victoryModal.classList.add('hidden');
+          this.startNewGame();
+        });
+
+        const soundBtn = document.getElementById('sound-btn');
+        soundBtn.addEventListener('click', () => {
+          sound.muted = !sound.muted;
+          soundBtn.innerHTML = sound.muted ? 
+            '<i class="fa-solid fa-volume-xmark text-xs text-rose-400"></i>' : 
+            '<i class="fa-solid fa-volume-high text-xs"></i>';
+        });
+
+        this.difficultySelect.addEventListener('change', (e) => {
+          this.difficulty = e.target.value;
+          this.startNewGame();
+        });
+
+        document.getElementById('pause-btn').addEventListener('click', () => this.togglePause(true));
+        document.getElementById('resume-btn').addEventListener('click', () => this.togglePause(false));
+
+        window.addEventListener('keydown', (e) => {
+          if (this.isPaused || this.isGameOver) return;
+
+          if (e.key >= '1' && e.key <= '9') {
+            this.handleInput(parseInt(e.key));
+          } else if (e.key === 'n' || e.key === 'N') {
+            notesBtn.click();
+          } else if (e.key === 'Backspace' || e.key === 'Delete') {
+            this.eraseCell();
+          } else if (this.selectedCell !== null) {
+            let row = Math.floor(this.selectedCell / 9);
+            let col = this.selectedCell % 9;
+
+            if (e.key === 'ArrowUp' && row > 0) row--;
+            else if (e.key === 'ArrowDown' && row < 8) row++;
+            else if (e.key === 'ArrowLeft' && col > 0) col--;
+            else if (e.key === 'ArrowRight' && col < 8) col++;
+
+            const newIdx = row * 9 + col;
+            if (newIdx !== this.selectedCell) {
+              this.selectCell(newIdx);
+            }
+          }
+        });
+      }
+
+      startTimer() {
+        this.stopTimer();
+        this.timer = 0;
+        this.updateTimerDisplay();
+        this.timerInterval = setInterval(() => {
+          if (!this.isPaused && !this.isGameOver) {
+            this.timer++;
+            this.updateTimerDisplay();
+          }
+        }, 1000);
+      }
+
+      stopTimer() {
+        if (this.timerInterval) clearInterval(this.timerInterval);
+      }
+
+      updateTimerDisplay() {
+        const mins = Math.floor(this.timer / 60).toString().padStart(2, '0');
+        const secs = (this.timer % 60).toString().padStart(2, '0');
+        this.timerDisplay.textContent = `${mins}:${secs}`;
+      }
+
+      togglePause(pause) {
+        this.isPaused = pause;
+        if (pause) {
+          this.pauseOverlay.classList.remove('hidden');
+          sound.click();
+        } else {
+          this.pauseOverlay.classList.add('hidden');
+          sound.click();
+        }
+      }
+
+      generatePuzzle() {
+        this.solution = Array(81).fill(0);
+        this.solveSudoku(this.solution);
+        this.grid = [...this.solution];
+
+        const removeCountMap = {
+          'easy': 32,
+          'medium': 44,
+          'hard': 52,
+          'expert': 58
+        };
+
+        let removeCount = removeCountMap[this.difficulty] || 44;
+        while (removeCount > 0) {
+          const idx = Math.floor(Math.random() * 81);
+          if (this.grid[idx] !== 0) {
+            this.grid[idx] = 0;
+            removeCount--;
+          }
+        }
+
+        this.initialGrid = [...this.grid];
+        this.notes = Array(81).fill().map(() => new Set());
+      }
+
+      solveSudoku(board) {
+        for (let i = 0; i < 81; i++) {
+          if (board[i] === 0) {
+            const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
+            for (let num of numbers) {
+              if (this.isValidPlacement(board, i, num)) {
+                board[i] = num;
+                if (this.solveSudoku(board)) return true;
+                board[i] = 0;
+              }
+            }
+            return false;
+          }
+        }
+        return true;
+      }
+
+      isValidPlacement(board, idx, num) {
+        const row = Math.floor(idx / 9);
+        const col = idx % 9;
+
+        for (let i = 0; i < 9; i++) {
+          if (board[row * 9 + i] === num) return false;
+          if (board[i * 9 + col] === num) return false;
+          
+          const boxRow = 3 * Math.floor(row / 3) + Math.floor(i / 3);
+          const boxCol = 3 * Math.floor(col / 3) + (i % 3);
+          if (board[boxRow * 9 + boxCol] === num) return false;
+        }
+        return true;
+      }
+
+      startNewGame() {
+        this.isGameOver = false;
+        this.isPaused = false;
+        this.mistakes = 0;
+        this.hintsLeft = 3;
+        this.selectedCell = null;
+        this.pauseOverlay.classList.add('hidden');
+        this.victoryModal.classList.add('hidden');
+
+        this.updateMistakesDisplay();
+        this.updateHintDisplay();
+        this.generatePuzzle();
+        this.render();
+        this.startTimer();
+      }
+
+      restartCurrentGame() {
+        this.isGameOver = false;
+        this.mistakes = 0;
+        this.grid = [...this.initialGrid];
+        this.notes = Array(81).fill().map(() => new Set());
+        this.selectedCell = null;
+        this.updateMistakesDisplay();
+        this.render();
+        this.startTimer();
+        sound.click();
+      }
+
+      selectCell(index) {
+        if (this.isPaused || this.isGameOver) return;
+        this.selectedCell = index;
+        sound.select();
+        this.updateHighlights();
+      }
+
+      updateHighlights() {
+        const cells = this.gridElement.children;
+        const selectedIdx = this.selectedCell;
+        const selectedVal = selectedIdx !== null ? this.grid[selectedIdx] : null;
+
+        const selRow = selectedIdx !== null ? Math.floor(selectedIdx / 9) : null;
+        const selCol = selectedIdx !== null ? selectedIdx % 9 : null;
+        const selBoxRow = selectedIdx !== null ? Math.floor(selRow / 3) : null;
+        const selBoxCol = selectedIdx !== null ? Math.floor(selCol / 3) : null;
+
+        for (let i = 0; i < 81; i++) {
+          const cell = cells[i];
+          const row = Math.floor(i / 9);
+          const col = i % 9;
+          const boxRow = Math.floor(row / 3);
+          const boxCol = Math.floor(col / 3);
+
+          cell.classList.remove('cell-selected', 'cell-related', 'cell-same-number');
+
+          if (selectedIdx === i) {
+            cell.classList.add('cell-selected');
+          } else if (selRow !== null && (row === selRow || col === selCol || (boxRow === selBoxRow && boxCol === selBoxCol))) {
+            cell.classList.add('cell-related');
+          }
+
+          if (selectedVal && selectedVal !== 0 && this.grid[i] === selectedVal) {
+            cell.classList.add('cell-same-number');
+          }
+        }
+      }
+
+      handleInput(num) {
+        if (this.selectedCell === null || this.isPaused || this.isGameOver) return;
+        if (this.initialGrid[this.selectedCell] !== 0) return;
+
+        if (this.isNotesMode) {
+          if (this.grid[this.selectedCell] === 0) {
+            const cellNotes = this.notes[this.selectedCell];
+            if (cellNotes.has(num)) {
+              cellNotes.delete(num);
+            } else {
+              cellNotes.add(num);
+            }
+            sound.click();
+            this.renderCell(this.selectedCell);
+          }
+          return;
+        }
+
+        if (this.grid[this.selectedCell] === num) return;
+
+        if (this.solution[this.selectedCell] === num) {
+          this.grid[this.selectedCell] = num;
+          this.notes[this.selectedCell].clear();
+          sound.fill();
+          this.renderCell(this.selectedCell);
+          this.updateHighlights();
+          this.checkWinCondition();
+        } else {
+          this.mistakes++;
+          this.updateMistakesDisplay();
+          sound.error();
+
+          const cell = this.gridElement.children[this.selectedCell];
+          cell.classList.add('cell-error');
+          setTimeout(() => cell.classList.remove('cell-error'), 400);
+
+          if (this.mistakes >= this.maxMistakes) {
+            this.triggerGameOver();
+          }
+        }
+      }
+
+      eraseCell() {
+        if (this.selectedCell === null || this.isPaused || this.isGameOver) return;
+        if (this.initialGrid[this.selectedCell] !== 0) return;
+
+        let changed = false;
+        if (this.grid[this.selectedCell] !== 0) {
+          this.grid[this.selectedCell] = 0;
+          changed = true;
+        }
+        if (this.notes[this.selectedCell].size > 0) {
+          this.notes[this.selectedCell].clear();
+          changed = true;
+        }
+
+        if (changed) {
+          sound.erase();
+          this.renderCell(this.selectedCell);
+          this.updateHighlights();
+        }
+      }
+
+      giveHint() {
+        if (this.hintsLeft <= 0 || this.selectedCell === null || this.isPaused || this.isGameOver) return;
+
+        if (this.grid[this.selectedCell] !== this.solution[this.selectedCell]) {
+          this.grid[this.selectedCell] = this.solution[this.selectedCell];
+          this.notes[this.selectedCell].clear();
+          this.hintsLeft--;
+          this.updateHintDisplay();
+          sound.hint();
+          this.renderCell(this.selectedCell);
+          this.updateHighlights();
+          this.checkWinCondition();
+        }
+      }
+
+      updateMistakesDisplay() {
+        this.mistakesDisplay.textContent = `${this.mistakes} / ${this.maxMistakes}`;
+      }
+
+      updateHintDisplay() {
+        this.hintCountDisplay.textContent = this.hintsLeft;
+      }
+
+      renderCell(idx) {
+        const cell = this.gridElement.children[idx];
+        const val = this.grid[idx];
+        const cellNotes = this.notes[idx];
+
+        cell.textContent = '';
+        cell.classList.remove('cell-given', 'cell-user');
+
+        if (val !== 0) {
+          cell.textContent = val;
+          if (this.initialGrid[idx] !== 0) {
+            cell.classList.add('cell-given');
+          } else {
+            cell.classList.add('cell-user');
+          }
+        } else if (cellNotes.size > 0) {
+          const notesContainer = document.createElement('div');
+          notesContainer.className = 'notes-grid';
+          
+          for (let i = 1; i <= 9; i++) {
+            const noteItem = document.createElement('div');
+            noteItem.className = 'note-item';
+            if (cellNotes.has(i)) {
+              noteItem.textContent = i;
+            }
+            notesContainer.appendChild(noteItem);
+          }
+          cell.appendChild(notesContainer);
+        }
+      }
+
+      render() {
+        for (let i = 0; i < 81; i++) {
+          this.renderCell(i);
+        }
+        this.updateHighlights();
+      }
+
+      checkWinCondition() {
+        const isComplete = this.grid.every((val, idx) => val === this.solution[idx]);
+        if (isComplete) {
+          this.isGameOver = true;
+          this.stopTimer();
+          sound.win();
+
+          if (typeof confetti === 'function') {
+            confetti({
+              particleCount: 150,
+              spread: 80,
+              origin: { y: 0.6 }
+            });
+          }
+
+          document.getElementById('win-time').textContent = this.timerDisplay.textContent;
+          document.getElementById('win-diff').textContent = this.difficultySelect.options[this.difficultySelect.selectedIndex].text;
+          document.getElementById('win-mistakes').textContent = `${this.mistakes}/${this.maxMistakes}`;
+
+          setTimeout(() => {
+            this.victoryModal.classList.remove('hidden');
+          }, 400);
+        }
+      }
+
+      triggerGameOver() {
+        this.isGameOver = true;
+        this.stopTimer();
+        alert('Fim de Jogo! Atingiu o limite máximo de erros. Tente novamente!');
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      new SudokuGame();
+    });
+  </script>
+</body>
+</html>
