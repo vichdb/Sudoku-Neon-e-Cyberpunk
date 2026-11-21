@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sudoku: Neon Cyberpunk vs Punk Rock</title>
   <!-- Tailwind CSS (compilado, embutido abaixo; sem CDN) -->
-  <!-- Font Awesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Canvas Confetti Library -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -239,17 +235,17 @@
         <div class="flex items-center gap-1 font-mono font-bold text-emerald-400">
           <span id="timer-display">00:00</span>
           <button id="pause-btn" aria-label="Pausar o jogo" class="text-slate-400 hover:text-emerald-400 transition-colors ml-1">
-            <i aria-hidden="true" class="fa-solid fa-pause text-xs"></i>
+            <svg aria-hidden="true" class="" style="width:0.85em;height:0.85em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
           </button>
         </div>
       </div>
 
       <div class="flex items-center justify-end gap-1.5">
         <button id="rank-btn" aria-label="Abrir ranking global" title="Ranking global" class="w-8 h-8 rounded-lg bg-slate-800/80 border border-slate-700 text-amber-400 hover:text-amber-300 flex items-center justify-center transition-all">
-          <i aria-hidden="true" class="fa-solid fa-trophy text-xs"></i>
+          <svg aria-hidden="true" class="" style="width:0.85em;height:0.85em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>
         </button>
         <button id="sound-btn" aria-label="Ligar ou desligar o som" class="w-8 h-8 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-sky-400 flex items-center justify-center transition-all">
-          <i aria-hidden="true" class="fa-solid fa-volume-high text-xs"></i>
+          <svg aria-hidden="true" class="" style="width:0.85em;height:0.85em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
         </button>
       </div>
     </div>
@@ -258,10 +254,10 @@
     <div class="relative w-full aspect-square bg-slate-950/90 rounded-2xl border-2 border-indigo-900/60 p-1 shadow-2xl overflow-hidden">
       
       <div id="pause-overlay" role="dialog" aria-label="Jogo pausado" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-30 flex flex-col items-center justify-center gap-3 hidden">
-        <i aria-hidden="true" class="fa-solid fa-circle-pause text-5xl text-sky-400 animate-pulse"></i>
+        <svg aria-hidden="true" class="text-sky-400 animate-pulse" style="width:3rem;height:3rem;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
         <span class="text-lg font-bold text-slate-200 tracking-wider font-title">PAUSADO</span>
         <button id="resume-btn" class="px-6 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm transition-all btn-glow flex items-center gap-2">
-          <i aria-hidden="true" class="fa-solid fa-play"></i> Continuar
+          <svg aria-hidden="true" class="" style="width:1em;height:1em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg> Continuar
         </button>
       </div>
 
@@ -271,28 +267,28 @@
     <!-- Barra de Ferramentas -->
     <div class="grid grid-cols-5 gap-1.5 sm:gap-2">
       <button id="notes-btn" aria-pressed="false" aria-label="Modo notas (tecla N)" class="flex flex-col items-center justify-center p-2 rounded-xl border text-slate-300 transition-all btn-glow">
-        <i aria-hidden="true" class="fa-solid fa-pencil text-sm mb-1"></i>
+        <svg aria-hidden="true" class="mb-1" style="width:1em;height:1em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3"/></svg>
         <span class="text-[9px] sm:text-[10px] font-semibold">Notas</span>
       </button>
 
       <button id="erase-btn" aria-label="Apagar célula" class="flex flex-col items-center justify-center p-2 rounded-xl border text-slate-300 transition-all btn-glow">
-        <i aria-hidden="true" class="fa-solid fa-eraser text-sm mb-1"></i>
+        <svg aria-hidden="true" class="mb-1" style="width:1em;height:1em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l9-10 7 6-6 8H8zM9 20h11"/></svg>
         <span class="text-[9px] sm:text-[10px] font-semibold">Apagar</span>
       </button>
 
       <button id="hint-btn" aria-label="Usar dica" class="flex flex-col items-center justify-center p-2 rounded-xl border text-slate-300 transition-all btn-glow relative">
-        <i aria-hidden="true" class="fa-solid fa-lightbulb text-sm mb-1"></i>
+        <svg aria-hidden="true" class="mb-1" style="width:1em;height:1em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10c1 1 1 2 1 3h6c0-1 0-2 1-3a6 6 0 0 0-4-10z"/></svg>
         <span class="text-[9px] sm:text-[10px] font-semibold">Dica</span>
         <span id="hint-count" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">3</span>
       </button>
 
       <button id="restart-btn" aria-label="Reiniciar este puzzle" class="flex flex-col items-center justify-center p-2 rounded-xl border text-slate-300 transition-all btn-glow">
-        <i aria-hidden="true" class="fa-solid fa-rotate-left text-sm mb-1"></i>
+        <svg aria-hidden="true" class="mb-1" style="width:1em;height:1em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>
         <span class="text-[9px] sm:text-[10px] font-semibold">Reiniciar</span>
       </button>
 
       <button id="new-game-btn" aria-label="Novo jogo" class="flex flex-col items-center justify-center p-2 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 text-white border border-indigo-400/30 transition-all btn-glow shadow-lg">
-        <i aria-hidden="true" class="fa-solid fa-plus text-sm mb-1"></i>
+        <svg aria-hidden="true" class="mb-1" style="width:1em;height:1em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         <span class="text-[9px] sm:text-[10px] font-bold">Novo</span>
       </button>
     </div>
@@ -312,11 +308,23 @@
 
   </div>
 
+  <!-- Modal de Fim de Jogo (limite de erros) -->
+  <div id="gameover-modal" role="alertdialog" aria-modal="true" aria-labelledby="gameover-title" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md hidden">
+    <div class="glass-panel max-w-sm w-full rounded-3xl p-6 text-center border-2 border-rose-500/40 shadow-2xl">
+      <h2 id="gameover-title" class="text-2xl font-black text-white tracking-wide mb-2 font-title">FIM DE JOGO</h2>
+      <p class="text-slate-300 text-sm mb-5">Você atingiu o limite máximo de erros. Tente de novo!</p>
+      <div class="flex gap-2">
+        <button id="gameover-retry-btn" class="flex-1 px-4 py-2 rounded-xl bg-slate-800 border border-slate-600 text-slate-200 font-bold text-sm">Repetir este</button>
+        <button id="gameover-new-btn" class="flex-1 px-4 py-2 rounded-xl bg-sky-500 text-slate-950 font-bold text-sm">Novo jogo</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal de Vitória -->
   <div id="victory-modal" role="dialog" aria-modal="true" aria-label="Vitória" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md hidden">
     <div class="glass-panel max-w-sm w-full rounded-3xl p-6 text-center border-2 border-emerald-500/40 shadow-2xl transform scale-95 transition-all">
       <div class="w-16 h-16 bg-emerald-500/20 border border-emerald-400/40 rounded-2xl flex items-center justify-center text-emerald-400 text-3xl mx-auto mb-4 animate-bounce">
-        <i aria-hidden="true" class="fa-solid fa-trophy"></i>
+        <svg aria-hidden="true" class="" style="width:1em;height:1em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>
       </div>
       <h2 class="text-2xl font-black text-white tracking-wide mb-1 font-title">VITÓRIA!</h2>
       <p class="text-slate-300 text-xs mb-4">Completou o Sudoku com maestria!</p>
@@ -431,10 +439,14 @@
 
     // ===== Ranking global (Google Apps Script + Planilha) =====
     const RANKING_URL = 'https://script.google.com/macros/s/AKfycbxyg3un7yjGej22HHERo3WCAZvNAf87pWPPfsGBtLyJtkw74K-91MxRN-9tYumpmQjm4w/exec';
+    // RANKING NOVO (seguro): cole aqui o endereço /exec do novo Apps Script. Vazio ('') = continua usando o ranking antigo.
+    const NOVO_RANKING_URL = 'https://script.google.com/macros/s/AKfycbx7h551NJ-UesQWLQtz-vOXwFm3pu7SDtOuC8ANpi7GojbtjYLToAxU31zjldXyvf8R/exec';
+    const RANKING_BASE = NOVO_RANKING_URL || RANKING_URL;
     const NICK_KEY = 'telas_nick';
     const NICK_RE = /[^\p{L}\p{N} _.-]/gu;
     const DIFF_NAMES = { easy: 'Fácil', medium: 'Médio', hard: 'Difícil', expert: 'Expert' };
 
+    const SAVE_KEY = 'sudoku_neon_save_v1';
     function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
     function fmtTime(s) {
@@ -447,7 +459,7 @@
       const to = setTimeout(() => ctrl.abort(), 9000);
       try {
         const qs = new URLSearchParams(params).toString();
-        const r = await fetch(RANKING_URL + '?' + qs, { signal: ctrl.signal });
+        const r = await fetch(RANKING_BASE + '?' + qs, { signal: ctrl.signal });
         return await r.json();
       } finally { clearTimeout(to); }
     }
@@ -485,6 +497,35 @@
       }
     }
 
+    // Confete próprio em canvas (sem biblioteca externa)
+    function confetti(opts) {
+      try {
+        if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const o = opts || {};
+        const cv = document.createElement('canvas');
+        cv.setAttribute('aria-hidden', 'true');
+        cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60';
+        cv.width = innerWidth; cv.height = innerHeight;
+        document.body.appendChild(cv);
+        const ctx = cv.getContext('2d');
+        const colors = ['#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa'];
+        const oy = (o.origin && o.origin.y != null ? o.origin.y : 0.6) * cv.height;
+        const parts = Array.from({ length: o.particleCount || 120 }, () => {
+          const a = (-90 + (Math.random() - 0.5) * (o.spread || 80)) * Math.PI / 180, v = 8 + Math.random() * 10;
+          return { x: cv.width / 2, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6, w: 5 + Math.random() * 5, c: colors[(Math.random() * colors.length) | 0], life: 0 };
+        });
+        const t0 = performance.now();
+        (function frame(t) {
+          ctx.clearRect(0, 0, cv.width, cv.height);
+          for (const p of parts) {
+            p.vy += 0.3; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += 0.15;
+            ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.w / 4, p.w, p.w / 2); ctx.restore();
+          }
+          if (t - t0 < 2500) requestAnimationFrame(frame); else cv.remove();
+        })(t0);
+      } catch (e) {}
+    }
+
     class SudokuGame {
       constructor() {
         this.grid = Array(81).fill(0);
@@ -517,7 +558,43 @@
 
         this.initDOM();
         this.bindEvents();
-        this.startNewGame();
+        if (!this.resume()) this.startNewGame();
+      }
+
+      // ---- Salvar / continuar partida ----
+      save() {
+        try {
+          if (this.isGameOver) return;
+          lsSet(SAVE_KEY, JSON.stringify({
+            v: 1, d: this.difficulty, g: this.grid, i: this.initialGrid, s: this.solution,
+            n: this.notes.map(n => [...n]), m: this.mistakes, h: this.hintsLeft, t: this.timer
+          }));
+        } catch (e) {}
+      }
+      clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+      resume() {
+        try {
+          const raw = lsGet(SAVE_KEY); if (!raw) return false;
+          const d = JSON.parse(raw);
+          const ok = a => Array.isArray(a) && a.length === 81 && a.every(x => Number.isInteger(x) && x >= 0 && x <= 9);
+          if (!d || d.v !== 1 || !ok(d.g) || !ok(d.i) || !ok(d.s) || !Array.isArray(d.n) || d.n.length !== 81) return false;
+          if (!['easy', 'medium', 'hard', 'expert'].includes(d.d)) return false;
+          if (d.g.every((x, k) => x === d.s[k])) return false;
+          this.difficulty = d.d; this.difficultySelect.value = d.d;
+          this.grid = d.g; this.initialGrid = d.i; this.solution = d.s;
+          this.notes = d.n.map(a => new Set((Array.isArray(a) ? a : []).filter(x => x >= 1 && x <= 9)));
+          this.mistakes = Math.min(Math.max(0, d.m | 0), this.maxMistakes - 1);
+          this.hintsLeft = Math.min(3, Math.max(0, d.h | 0));
+          this.isGameOver = false;
+          this.updateMistakesDisplay(); this.updateHintDisplay();
+          this.render();
+          this.startTimer();
+          this.timer = Math.max(0, d.t | 0);
+          this.startRankSession(this.timer);
+          this.updateTimerDisplay();
+          this.togglePause(true);   // abre pausado: o jogador toca em "Continuar"
+          return true;
+        } catch (e) { return false; }
       }
 
       initDOM() {
@@ -598,8 +675,8 @@
         soundBtn.addEventListener('click', () => {
           sound.muted = !sound.muted;
           soundBtn.innerHTML = sound.muted ? 
-            '<i aria-hidden="true" class="fa-solid fa-volume-xmark text-xs text-rose-400"></i>' : 
-            '<i aria-hidden="true" class="fa-solid fa-volume-high text-xs"></i>';
+            '<svg aria-hidden="true" class="text-rose-400" style="width:0.85em;height:0.85em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4zM16 9l5 6M21 9l-5 6"/></svg>' : 
+            '<svg aria-hidden="true" class="" style="width:0.85em;height:0.85em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
         });
 
         this.difficultySelect.addEventListener('change', (e) => {
@@ -628,6 +705,13 @@
           sound.select();
         }));
 
+        document.getElementById('gameover-new-btn').addEventListener('click', () => { document.getElementById('gameover-modal').classList.add('hidden'); this.startNewGame(); });
+        document.getElementById('gameover-retry-btn').addEventListener('click', () => { document.getElementById('gameover-modal').classList.add('hidden'); this.restartCurrentGame(); });
+        // Pausa automática ao sair da aba (o relógio não corre em segundo plano)
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden && !this.isPaused && !this.isGameOver) this.togglePause(true);
+        });
+        window.addEventListener('pagehide', () => this.save());
         document.getElementById('pause-btn').addEventListener('click', () => this.togglePause(true));
         document.getElementById('resume-btn').addEventListener('click', () => this.togglePause(false));
 
@@ -663,6 +747,17 @@
         });
       }
 
+      // Sessão do ranking novo: pedida quando a partida começa (ou é retomada)
+      async startRankSession(prior) {
+        this.rankToken = null;
+        if (!NOVO_RANKING_URL) return;
+        const my = this.rankSeq = (this.rankSeq || 0) + 1;
+        try {
+          const j = await apiCall({ action: 'start', game: 'sudoku', diff: this.difficulty, prior: Math.max(0, prior | 0) });
+          if (j && j.ok && j.token && my === this.rankSeq) this.rankToken = j.token;
+        } catch (e) { /* sem sessão = esta partida não entra no ranking */ }
+      }
+
       openRank() {
         document.querySelectorAll('.rank-tab').forEach(b => b.classList.toggle('on', b.dataset.diff === this.rankDiff));
         loadRank(this.rankDiff, document.getElementById('rank-list'));
@@ -671,7 +766,7 @@
       updateSubmitBox() {
         const box = document.getElementById('submit-box');
         const p = this.pendingSubmit;
-        const show = !!(RANKING_URL && p && !p.sent);
+        const show = !!(RANKING_BASE && p && !p.sent && (!NOVO_RANKING_URL || p.token));
         box.classList.toggle('hidden', !show);
         document.getElementById('submit-btn').disabled = false;
         document.getElementById('submit-msg').textContent = '';
@@ -693,7 +788,9 @@
         if (!nick) { msg.textContent = 'Digite um apelido.'; input.focus(); return; }
         p.busy = true; btn.disabled = true; msg.textContent = 'Enviando…';
         try {
-          const j = await apiCall({ action: 'add', game: 'sudoku', nick, diff: p.diff, time: p.time, mistakes: p.mistakes, hints: p.hints });
+          const params = { action: 'add', game: 'sudoku', nick, diff: p.diff, time: p.time, mistakes: p.mistakes, hints: p.hints };
+          if (NOVO_RANKING_URL) params.token = p.token;
+          const j = await apiCall(params);
           if (j && j.ok) {
             p.sent = true;
             lsSet(NICK_KEY, nick);
@@ -719,6 +816,7 @@
           if (!this.isPaused && !this.isGameOver) {
             this.timer++;
             this.updateTimerDisplay();
+            if (this.timer % 5 === 0) this.save();
           }
         }, 1000);
       }
@@ -843,6 +941,7 @@
         this.selectedCell = null;
         this.pauseOverlay.classList.add('hidden');
         this.victoryModal.classList.add('hidden');
+        document.getElementById('gameover-modal').classList.add('hidden');
         this.pendingSubmit = null;
 
         this.updateMistakesDisplay();
@@ -850,6 +949,8 @@
         this.generatePuzzle();
         this.render();
         this.startTimer();
+        this.startRankSession(0);
+        this.save();
       }
 
       restartCurrentGame() {
@@ -861,6 +962,7 @@
         this.updateMistakesDisplay();
         this.render();
         this.startTimer();
+        this.save();
         sound.click();
       }
 
@@ -920,6 +1022,7 @@
             }
             sound.click();
             this.renderCell(this.selectedCell);
+            this.save();
           }
           return;
         }
@@ -932,10 +1035,12 @@
           sound.fill();
           this.renderCell(this.selectedCell);
           this.updateHighlights();
+          this.save();
           this.checkWinCondition();
         } else {
           this.mistakes++;
           this.updateMistakesDisplay();
+          this.save();
           sound.error();
 
           const cell = this.gridElement.children[this.selectedCell];
@@ -966,6 +1071,7 @@
           sound.erase();
           this.renderCell(this.selectedCell);
           this.updateHighlights();
+          this.save();
         }
       }
 
@@ -980,6 +1086,7 @@
           sound.hint();
           this.renderCell(this.selectedCell);
           this.updateHighlights();
+          this.save();
           this.checkWinCondition();
         }
       }
@@ -1040,6 +1147,7 @@
         if (isComplete) {
           this.isGameOver = true;
           this.stopTimer();
+          this.clearSave();
           sound.win();
 
           if (typeof confetti === 'function') {
@@ -1054,7 +1162,7 @@
           document.getElementById('win-diff').textContent = this.difficultySelect.options[this.difficultySelect.selectedIndex].text;
           document.getElementById('win-mistakes').textContent = `${this.mistakes}/${this.maxMistakes}`;
 
-          this.pendingSubmit = { diff: this.difficulty, time: this.timer, mistakes: this.mistakes, hints: 3 - this.hintsLeft, sent: false, busy: false };
+          this.pendingSubmit = { diff: this.difficulty, time: this.timer, mistakes: this.mistakes, hints: 3 - this.hintsLeft, sent: false, busy: false, token: this.rankToken || null };
           this.updateSubmitBox();
 
           setTimeout(() => {
@@ -1066,7 +1174,9 @@
       triggerGameOver() {
         this.isGameOver = true;
         this.stopTimer();
-        alert('Fim de Jogo! Atingiu o limite máximo de erros. Tente novamente!');
+        this.clearSave();
+        document.getElementById('gameover-modal').classList.remove('hidden');
+        const b = document.getElementById('gameover-new-btn'); if (b) b.focus();
       }
     }
 
