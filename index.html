@@ -213,6 +213,11 @@
       </div>
     </div>
 
+    <div class="flex items-center justify-between gap-2 px-1" id="daily-row">
+      <button id="daily-btn" type="button" aria-label="Jogar o desafio do dia" class="px-3 py-2 rounded-xl bg-slate-900/90 border border-amber-500/50 text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition-all">📅 Desafio do dia</button>
+      <span id="daily-info" class="text-[11px] text-slate-400 text-right"></span>
+    </div>
+
     <!-- Barra de Status -->
     <div class="grid grid-cols-4 gap-2 bg-slate-950/70 p-3 rounded-2xl border border-slate-800 text-xs sm:text-sm">
       <div class="flex flex-col items-start justify-center">
@@ -358,6 +363,11 @@
         <ol id="win-rank-list" class="rank-list"></ol>
       </div>
 
+      <div id="share-row" class="hidden mb-3">
+        <button id="share-btn" type="button" class="w-full py-2.5 rounded-xl bg-slate-900 border border-amber-500/50 text-amber-300 text-sm font-bold">📤 Compartilhar resultado</button>
+        <p id="share-msg" class="text-[11px] text-slate-400 mt-1 min-h-[1rem]"></p>
+      </div>
+
       <button id="modal-new-game-btn" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold tracking-wide shadow-lg hover:brightness-110 active:scale-98 transition-all btn-glow font-title">
         Jogar Novamente
       </button>
@@ -447,6 +457,7 @@
     const DIFF_NAMES = { easy: 'Fácil', medium: 'Médio', hard: 'Difícil', expert: 'Expert' };
 
     const SAVE_KEY = 'sudoku_neon_save_v1';
+    function dayKey() { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
     function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
     function fmtTime(s) {
@@ -559,6 +570,7 @@
         this.initDOM();
         this.bindEvents();
         if (!this.resume()) this.startNewGame();
+        this.updateDailyInfo();
       }
 
       // ---- Salvar / continuar partida ----
@@ -567,7 +579,7 @@
           if (this.isGameOver) return;
           lsSet(SAVE_KEY, JSON.stringify({
             v: 1, d: this.difficulty, g: this.grid, i: this.initialGrid, s: this.solution,
-            n: this.notes.map(n => [...n]), m: this.mistakes, h: this.hintsLeft, t: this.timer
+            n: this.notes.map(n => [...n]), m: this.mistakes, h: this.hintsLeft, t: this.timer, dy: this.daily ? 1 : 0
           }));
         } catch (e) {}
       }
@@ -580,7 +592,7 @@
           if (!d || d.v !== 1 || !ok(d.g) || !ok(d.i) || !ok(d.s) || !Array.isArray(d.n) || d.n.length !== 81) return false;
           if (!['easy', 'medium', 'hard', 'expert'].includes(d.d)) return false;
           if (d.g.every((x, k) => x === d.s[k])) return false;
-          this.difficulty = d.d; this.difficultySelect.value = d.d;
+          this.difficulty = d.d; this.difficultySelect.value = d.d; this.daily = d.dy === 1;
           this.grid = d.g; this.initialGrid = d.i; this.solution = d.s;
           this.notes = d.n.map(a => new Set((Array.isArray(a) ? a : []).filter(x => x >= 1 && x <= 9)));
           this.mistakes = Math.min(Math.max(0, d.m | 0), this.maxMistakes - 1);
@@ -666,6 +678,8 @@
         document.getElementById('hint-btn').addEventListener('click', () => this.giveHint());
         document.getElementById('restart-btn').addEventListener('click', () => this.restartCurrentGame());
         document.getElementById('new-game-btn').addEventListener('click', () => this.startNewGame());
+        document.getElementById('daily-btn').addEventListener('click', () => this.startDaily());
+        document.getElementById('share-btn').addEventListener('click', () => this.shareDaily());
         document.getElementById('modal-new-game-btn').addEventListener('click', () => {
           this.victoryModal.classList.add('hidden');
           this.startNewGame();
@@ -843,8 +857,9 @@
       }
 
       shuffle(arr) {
+        const rnd = this.rng || Math.random;
         for (let i = arr.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
+          const j = Math.floor(rnd() * (i + 1));
           [arr[i], arr[j]] = [arr[j], arr[i]];
         }
         return arr;
@@ -933,7 +948,16 @@
         return true;
       }
 
-      startNewGame() {
+      startDaily() {
+        this.daily = true;
+        this.difficulty = 'medium'; this.difficultySelect.value = 'medium';
+        let h = 2166136261; for (const ch of 'sudoku-' + dayKey()) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+        let a = h >>> 0;
+        this.rng = function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+        this.startNewGame(true);
+      }
+      startNewGame(keepDaily) {
+        if (keepDaily !== true) this.daily = false;
         this.isGameOver = false;
         this.isPaused = false;
         this.mistakes = 0;
@@ -947,10 +971,12 @@
         this.updateMistakesDisplay();
         this.updateHintDisplay();
         this.generatePuzzle();
+        this.rng = null;
         this.render();
         this.startTimer();
         this.startRankSession(0);
         this.save();
+        this.updateDailyInfo();
       }
 
       restartCurrentGame() {
@@ -1162,13 +1188,39 @@
           document.getElementById('win-diff').textContent = this.difficultySelect.options[this.difficultySelect.selectedIndex].text;
           document.getElementById('win-mistakes').textContent = `${this.mistakes}/${this.maxMistakes}`;
 
-          this.pendingSubmit = { diff: this.difficulty, time: this.timer, mistakes: this.mistakes, hints: 3 - this.hintsLeft, sent: false, busy: false, token: this.rankToken || null };
+          this.pendingSubmit = this.daily ? null : { diff: this.difficulty, time: this.timer, mistakes: this.mistakes, hints: 3 - this.hintsLeft, sent: false, busy: false, token: this.rankToken || null };
           this.updateSubmitBox();
+          this.finishDaily();
 
           setTimeout(() => {
             this.victoryModal.classList.remove('hidden');
           }, 400);
         }
+      }
+
+      updateDailyInfo() {
+        const el = document.getElementById('daily-info'); if (!el) return;
+        let st = {}; try { st = JSON.parse(lsGet('sudoku_daily') || '{}') || {}; } catch (e) {}
+        const today = dayKey();
+        el.textContent = (st.last === today ? '✅ Hoje feito: ' + fmtTime(st.time || 0) + ' · ' : '') + (st.streak > 0 ? '🔥 Sequência: ' + st.streak + ' dia' + (st.streak > 1 ? 's' : '') : '');
+      }
+      finishDaily() {
+        const row = document.getElementById('share-row');
+        if (row) row.classList.toggle('hidden', !this.daily);
+        if (!this.daily) return;
+        let st = {}; try { st = JSON.parse(lsGet('sudoku_daily') || '{}') || {}; } catch (e) {}
+        const today = dayKey(), y = new Date(); y.setDate(y.getDate() - 1);
+        if (st.last !== today) { st.streak = (st.last === dayKey(y) ? (st.streak || 0) : 0) + 1; st.time = this.timer; }
+        else st.time = Math.min(st.time || this.timer, this.timer);
+        st.last = today; lsSet('sudoku_daily', JSON.stringify(st));
+        this.shareText = 'Telas do Passado — Sudoku do dia ' + today + '\n⏱ ' + fmtTime(this.timer) + ' • ' + this.mistakes + ' erro(s) • ' + (3 - this.hintsLeft) + ' dica(s)\n🔥 Sequência: ' + st.streak;
+        this.updateDailyInfo();
+      }
+      async shareDaily() {
+        const text = this.shareText; if (!text) return;
+        try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+        try { await navigator.clipboard.writeText(text); document.getElementById('share-msg').textContent = 'Resultado copiado!'; }
+        catch (e) { document.getElementById('share-msg').textContent = 'Não consegui copiar. Tire um print.'; }
       }
 
       triggerGameOver() {
