@@ -688,6 +688,7 @@
         const soundBtn = document.getElementById('sound-btn');
         soundBtn.addEventListener('click', () => {
           sound.muted = !sound.muted;
+          if (window.TP) TP.mute(sound.muted);
           soundBtn.innerHTML = sound.muted ? 
             '<svg aria-hidden="true" class="text-rose-400" style="width:0.85em;height:0.85em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4zM16 9l5 6M21 9l-5 6"/></svg>' : 
             '<svg aria-hidden="true" class="" style="width:0.85em;height:0.85em;display:inline-block;vertical-align:-0.125em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
@@ -1059,12 +1060,14 @@
           this.grid[this.selectedCell] = num;
           this.notes[this.selectedCell].clear();
           sound.fill();
+          if (window.TPS) TPS.fill(this.grid, this.solution, this.selectedCell);
           this.renderCell(this.selectedCell);
           this.updateHighlights();
           this.save();
           this.checkWinCondition();
         } else {
           this.mistakes++;
+          if (window.TPS) TPS.wrong(this.gridElement);
           this.updateMistakesDisplay();
           this.save();
           sound.error();
@@ -1110,6 +1113,7 @@
           this.hintsLeft--;
           this.updateHintDisplay();
           sound.hint();
+          if (window.TPS) TPS.hint();
           this.renderCell(this.selectedCell);
           this.updateHighlights();
           this.save();
@@ -1191,6 +1195,7 @@
           this.pendingSubmit = this.daily ? null : { diff: this.difficulty, time: this.timer, mistakes: this.mistakes, hints: 3 - this.hintsLeft, sent: false, busy: false, token: this.rankToken || null };
           this.updateSubmitBox();
           this.finishDaily();
+          if (window.TPS) { let ds = {}; try { ds = JSON.parse(lsGet('sudoku_daily') || '{}') || {}; } catch (e) {} TPS.win({ diff: this.difficulty, time: this.timer, mistakes: this.mistakes, hints: 3 - this.hintsLeft, daily: this.daily, streak: ds.streak || 0 }); }
 
           setTimeout(() => {
             this.victoryModal.classList.remove('hidden');
@@ -1227,6 +1232,7 @@
         this.isGameOver = true;
         this.stopTimer();
         this.clearSave();
+        if (window.TPS) TPS.lose();
         document.getElementById('gameover-modal').classList.remove('hidden');
         const b = document.getElementById('gameover-new-btn'); if (b) b.focus();
       }
@@ -1236,5 +1242,414 @@
       new SudokuGame();
     });
   </script>
+<!--TP-BEGIN-->
+<script>
+/* Telas do Passado — camada comum (música, conquistas, perfil, tutorial, vibração, efeitos).
+   Colada dentro de cada jogo pelo script ferramentas/aplicar-core.js. Não depende de nada externo. */
+(function () {
+  if (window.TP) return;
+  var LS = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  function jget(k, d) { try { var v = JSON.parse(LS.get(k)); return v == null ? d : v; } catch (e) { return d; } }
+  function jset(k, v) { LS.set(k, JSON.stringify(v)); }
+  var REDUCE = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function dayKey(d) { d = d || new Date(); var p = function (n) { return String(n).padStart(2, '0'); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+
+  var cfg = null;                    // configuração do jogo atual
+  var settings = jget('tp_settings', { music: true, vol: 0.6, sfx: true, vibe: true });
+  var profile = jget('tp_profile', { xp: 0, last: '', streak: 0, best: 0, ach: {}, games: {} });
+  function saveProfile() { jset('tp_profile', profile); }
+  function saveSettings() { jset('tp_settings', settings); }
+
+  /* ---------- níveis do perfil ---------- */
+  function levelFor(xp) { var l = 1, need = 100, rest = xp; while (rest >= need) { rest -= need; l++; need = 100 + (l - 1) * 40; } return { level: l, into: rest, need: need }; }
+
+  /* ---------- áudio ---------- */
+  var ctx = null, master = null, musicGain = null, sfxGain = null, noiseBuf = null;
+  function ensureAudio() {
+    if (ctx) { if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} } return ctx; }
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+      ctx = new AC(); master = ctx.createGain(); master.connect(ctx.destination);
+      musicGain = ctx.createGain(); musicGain.connect(master); sfxGain = ctx.createGain(); sfxGain.connect(master);
+      applyVol();
+      var len = ctx.sampleRate, b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1; noiseBuf = b;
+    } catch (e) { ctx = null; }
+    return ctx;
+  }
+  var gameMuted = false;
+  function applyVol() { if (!ctx) return; musicGain.gain.value = (settings.music && !gameMuted) ? 0.16 * settings.vol : 0; sfxGain.gain.value = (settings.sfx && !gameMuted) ? 0.5 * Math.max(.3, settings.vol) : 0; }
+  function note(f, t, dur, type, vol, dest, slide) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, slide), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function hat(t, vol, dest, dur) {
+    var s = ctx.createBufferSource(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+    s.buffer = noiseBuf; f.type = 'highpass'; f.frequency.value = 7000;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.05));
+    s.connect(f); f.connect(g); g.connect(dest); s.start(t); s.stop(t + 0.1);
+  }
+  function kick(t, vol, dest) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.14);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t + 0.2);
+  }
+  function mf(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+
+  /* estilos musicais: acordes em graus (semitons sobre a raiz), padrão de arpejo e andamento */
+  var STYLES = {
+    neon:    { bpm: 124, root: 45, wave: 'sawtooth', bassWave: 'square', prog: [[0, 3, 7], [8, 12, 15], [5, 8, 12], [10, 14, 17]], arp: [0, 1, 2, 1, 2, 1, 0, 2], drums: 1, oct: 1 },
+    arcade:  { bpm: 138, root: 48, wave: 'square', bassWave: 'triangle', prog: [[0, 4, 7], [5, 9, 12], [7, 11, 14], [5, 9, 12]], arp: [0, 2, 1, 2, 0, 2, 1, 2], drums: 1, oct: 1 },
+    chill:   { bpm: 84, root: 50, wave: 'sine', bassWave: 'sine', prog: [[0, 4, 7, 11], [5, 9, 12, 16], [2, 5, 9, 12], [7, 11, 14, 17]], arp: [0, 2, 1, 3, 2, 1, 3, 2], drums: 0, oct: 1 },
+    jornal:  { bpm: 96, root: 48, wave: 'triangle', bassWave: 'sine', prog: [[0, 4, 7, 11], [9, 12, 16, 19], [2, 5, 9, 12], [7, 11, 14, 17]], arp: [0, 1, 2, 3, 2, 1, 2, 3], drums: 0, oct: 1 },
+    estadio: { bpm: 112, root: 45, wave: 'square', bassWave: 'triangle', prog: [[0, 4, 7], [5, 9, 12], [7, 11, 14], [0, 4, 7]], arp: [0, 0, 1, 0, 2, 0, 1, 2], drums: 1, oct: 1 },
+    cinema:  { bpm: 72, root: 46, wave: 'triangle', bassWave: 'sine', prog: [[0, 3, 7], [8, 12, 15], [5, 8, 12], [7, 11, 14]], arp: [0, 1, 2, 1, 0, 2, 1, 2], drums: 0, oct: 1, waltz: true },
+    terror:  { bpm: 66, root: 40, wave: 'sine', bassWave: 'triangle', prog: [[0, 3, 6], [1, 4, 8], [0, 3, 6], [-2, 1, 5]], arp: [0, 2, 1, 2, 0, 1, 2, 1], drums: 0, oct: 1 }
+  };
+  var mus = { style: null, timer: null, step: 0, next: 0, on: false, intensity: 0.5 };
+  function musicTick() {
+    if (!ctx || !mus.on || !mus.style) return;
+    var S = mus.style, spb = 60 / S.bpm / 4;
+    while (mus.next < ctx.currentTime + 0.25) {
+      var t = mus.next, st = mus.step, bar = Math.floor(st / 16) % S.prog.length, beat = st % 16, ch = S.prog[bar];
+      if (t < ctx.currentTime) t = ctx.currentTime + 0.02;
+      // baixo
+      if (beat % 4 === 0) note(mf(S.root + ch[0] - 12), t, spb * 3.6, S.bassWave, 0.5, musicGain);
+      // arpejo (mais notas conforme a intensidade)
+      var dense = mus.intensity > 0.55 || beat % 2 === 0;
+      if (dense) { var idx = S.arp[beat % S.arp.length], n = S.root + 12 + ch[idx % ch.length] + (beat % 8 === 7 ? 12 : 0); note(mf(n), t, spb * 1.7, S.wave, 0.18, musicGain); }
+      // pad longo no começo do compasso
+      if (beat === 0) { for (var k = 0; k < ch.length; k++) note(mf(S.root + ch[k]), t, spb * 15, 'sine', 0.12, musicGain); }
+      // bateria
+      if (S.drums) { if (beat % 4 === 0) kick(t, 0.55, musicGain); if (beat % 2 === 0 && mus.intensity > 0.35) hat(t, 0.12, musicGain, 0.04); if (beat % 8 === 4) hat(t, 0.25, musicGain, 0.09); }
+      else if (beat % 4 === 2 && mus.intensity > 0.5) hat(t, 0.05, musicGain, 0.12);
+      mus.next += spb; mus.step++;
+    }
+  }
+  var Music = {
+    start: function (styleName) {
+      if (styleName) mus.style = STYLES[styleName] || mus.style;
+      if (!settings.music || !mus.style) return;
+      if (!ensureAudio()) return;
+      if (mus.on) return;
+      mus.on = true; mus.next = ctx.currentTime + 0.1; mus.step = 0;
+      clearInterval(mus.timer); mus.timer = setInterval(musicTick, 60);
+    },
+    stop: function () { mus.on = false; clearInterval(mus.timer); mus.timer = null; },
+    set: function (styleName) { var was = mus.on; if (STYLES[styleName]) { mus.style = STYLES[styleName]; mus.step = 0; } if (!was) Music.start(); },
+    intensity: function (v) { mus.intensity = Math.max(0, Math.min(1, v)); }
+  };
+
+  /* efeitos sonoros da camada comum */
+  var SFX = {
+    ach: function (t) { note(mf(76), t, .12, 'triangle', .4, sfxGain); note(mf(83), t + .1, .12, 'triangle', .4, sfxGain); note(mf(88), t + .2, .28, 'triangle', .45, sfxGain); },
+    level: function (t) { [72, 76, 79, 84, 88].forEach(function (n, i) { note(mf(n), t + i * .08, .18, 'square', .25, sfxGain); }); },
+    win: function (t) { [72, 76, 79, 84].forEach(function (n, i) { note(mf(n), t + i * .1, .25, 'triangle', .4, sfxGain); }); note(mf(88), t + .45, .6, 'triangle', .45, sfxGain); },
+    lose: function (t) { [67, 64, 60, 55].forEach(function (n, i) { note(mf(n), t + i * .13, .25, 'sawtooth', .22, sfxGain, mf(n) * .8); }); },
+    coin: function (t) { note(mf(83), t, .07, 'square', .22, sfxGain); note(mf(88), t + .07, .16, 'square', .22, sfxGain); },
+    pop: function (t) { note(520, t, .09, 'sine', .35, sfxGain, 900); },
+    tick: function (t) { note(900, t, .03, 'square', .12, sfxGain); },
+    error: function (t) { note(150, t, .18, 'sawtooth', .3, sfxGain, 90); },
+    whoosh: function (t) { hat(t, .35, sfxGain, .25); },
+    boom: function (t) { kick(t, .9, sfxGain); hat(t, .3, sfxGain, .3); }
+  };
+  function sfx(name) { if (!settings.sfx) return; if (!ensureAudio()) return; var f = SFX[name]; if (f) { try { f(ctx.currentTime + 0.01); } catch (e) {} } }
+  function vibe(p) { if (!settings.vibe) return; try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+
+  /* ---------- interface ---------- */
+  var css = '' +
+    '#tp-fab{position:fixed;left:10px;bottom:10px;z-index:2147483000;width:38px;height:38px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(10,12,24,.82);color:#fff;font:700 17px/1 system-ui,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.5);padding:0;-webkit-tap-highlight-color:transparent;opacity:.9}' +
+    '#tp-fab:hover,#tp-fab:focus-visible{opacity:1;border-color:#ffd54a;outline:none}' +
+    '#tp-fab .dot{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;border-radius:8px;background:#ff3d71;color:#fff;font:800 10px/16px system-ui;text-align:center;padding:0 3px;display:none}' +
+    '#tp-fab.has-new .dot{display:block}' +
+    '#tp-ov{position:fixed;inset:0;z-index:2147483100;background:rgba(2,4,12,.82);display:none;align-items:center;justify-content:center;padding:14px;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}' +
+    '#tp-ov.open{display:flex}' +
+    '#tp-card{width:100%;max-width:460px;max-height:90vh;max-height:90dvh;overflow:auto;background:#10142a;color:#eaf0ff;border:2px solid #2d3566;border-radius:16px;padding:16px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;box-shadow:0 10px 40px rgba(0,0,0,.6)}' +
+    '#tp-card h2{margin:0 0 4px;font-size:18px;display:flex;align-items:center;justify-content:space-between;gap:8px}' +
+    '#tp-card .sub{margin:0 0 10px;font-size:12px;color:#9fb0d8}' +
+    '#tp-tabs{display:flex;gap:6px;margin:8px 0 10px}' +
+    '#tp-tabs button{flex:1;padding:9px 4px;border-radius:10px;border:1px solid #2d3566;background:#161b38;color:#cdd8ff;font:700 13px system-ui;cursor:pointer;min-height:40px}' +
+    '#tp-tabs button[aria-selected=true]{background:#ffd54a;color:#1a1400;border-color:#ffd54a}' +
+    '#tp-x{border:0;background:#1d2348;color:#fff;width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer}' +
+    '.tp-ach{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:#161b38;margin-bottom:6px;border:1px solid #232a52}' +
+    '.tp-ach .ic{font-size:24px;width:36px;text-align:center;flex:none}' +
+    '.tp-ach b{display:block;font-size:13px}.tp-ach span{font-size:11.5px;color:#9fb0d8}' +
+    '.tp-ach.lock{opacity:.5;filter:grayscale(1)}' +
+    '.tp-ach.got{border-color:#ffd54a55;background:#1d2040}' +
+    '.tp-bar{height:10px;border-radius:6px;background:#1d2348;overflow:hidden;margin:6px 0}' +
+    '.tp-bar i{display:block;height:100%;background:linear-gradient(90deg,#ffd54a,#ff8a3d);border-radius:6px}' +
+    '.tp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 4px;border-bottom:1px solid #232a52;font-size:14px}' +
+    '.tp-row input[type=range]{width:50%}' +
+    '.tp-sw{position:relative;width:46px;height:26px;border-radius:13px;background:#2a3160;border:0;cursor:pointer;flex:none}' +
+    '.tp-sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}' +
+    '.tp-sw[aria-checked=true]{background:#2ecc71}.tp-sw[aria-checked=true]::after{left:23px}' +
+    '.tp-btn{display:block;width:100%;margin-top:10px;padding:12px;border-radius:12px;border:0;background:#ffd54a;color:#1a1400;font:800 15px system-ui;cursor:pointer;min-height:46px}' +
+    '.tp-btn.sec{background:#1d2348;color:#fff;border:1px solid #2d3566}' +
+    '#tp-toasts{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:2147483200;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:min(92vw,360px)}' +
+    '.tp-toast{width:100%;background:#10142af2;color:#fff;border:2px solid #ffd54a;border-radius:12px;padding:9px 12px;display:flex;gap:10px;align-items:center;font:600 13px system-ui;box-shadow:0 6px 24px rgba(0,0,0,.55);animation:tpIn .35s ease-out}' +
+    '.tp-toast .ic{font-size:26px}.tp-toast small{display:block;color:#ffd54a;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}' +
+    '.tp-toast.out{opacity:0;transform:translateY(-10px);transition:all .4s}' +
+    '@keyframes tpIn{from{opacity:0;transform:translateY(-14px) scale(.96)}to{opacity:1;transform:none}}' +
+    '.tp-float{position:fixed;z-index:2147483050;pointer-events:none;font:900 20px system-ui;color:#ffd54a;text-shadow:0 2px 6px #000;animation:tpUp 1s ease-out forwards}' +
+    '@keyframes tpUp{from{opacity:1;transform:translate(-50%,0)}to{opacity:0;transform:translate(-50%,-60px)}}' +
+    '.tp-slide{text-align:center;padding:8px 4px}.tp-slide .big{font-size:48px;line-height:1.2}.tp-slide h3{margin:6px 0 4px;font-size:18px}.tp-slide p{margin:0;font-size:14px;line-height:1.45;color:#cdd8ff}' +
+    '.tp-dots{display:flex;justify-content:center;gap:6px;margin:8px 0}.tp-dots i{width:8px;height:8px;border-radius:50%;background:#2d3566}.tp-dots i.on{background:#ffd54a}' +
+    '@media (prefers-reduced-motion:reduce){.tp-toast,.tp-float{animation:none}}';
+
+  var els = {}, tab = 'ach', toastBox, pending = 0, lastFocus = null;
+  function el(tag, attrs, html) { var e = document.createElement(tag); if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
+
+  function buildUI() {
+    if (els.fab) return;
+    var st = el('style'); st.textContent = css; document.head.appendChild(st);
+    els.fab = el('button', { id: 'tp-fab', type: 'button', 'aria-label': 'Conquistas, som e como jogar', title: 'Conquistas, som e como jogar' }, '🎖️<span class="dot" aria-hidden="true"></span>');
+    els.fab.addEventListener('click', function () { openPanel(profileHasNew() ? 'ach' : tab); });
+    if (cfg.fab) { var fp = cfg.fab; ['left', 'right', 'top', 'bottom'].forEach(function (k) { els.fab.style[k] = ''; }); for (var k in fp) els.fab.style[k] = fp[k]; }
+    document.body.appendChild(els.fab);
+    toastBox = el('div', { id: 'tp-toasts', 'aria-live': 'polite' }); document.body.appendChild(toastBox);
+    els.ov = el('div', { id: 'tp-ov', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Painel Telas do Passado' });
+    els.ov.innerHTML = '<div id="tp-card"></div>';
+    els.ov.addEventListener('click', function (e) { if (e.target === els.ov) closePanel(); });
+    document.body.appendChild(els.ov);
+    els.card = els.ov.firstChild;
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && els.ov.classList.contains('open')) { e.stopPropagation(); closePanel(); }
+    }, true);
+    refreshBadge();
+  }
+  var seenKey = function () { return 'tp_seen_' + cfg.id; };
+  function myAch() { return (profile.ach[cfg.id] = profile.ach[cfg.id] || {}); }
+  function profileHasNew() { return pending > 0; }
+  function refreshBadge() { if (!els.fab) return; var d = els.fab.querySelector('.dot'); d.textContent = pending; els.fab.classList.toggle('has-new', pending > 0); }
+
+  function openPanel(t) {
+    buildUI(); lastFocus = document.activeElement; tab = t || tab; renderPanel(); els.ov.classList.add('open');
+    pending = 0; refreshBadge(); ensureAudio();
+    var f = els.card.querySelector('#tp-x'); if (f) f.focus();
+    if (typeof cfg.onPanel === 'function') { try { cfg.onPanel(true); } catch (e) {} }
+  }
+  function closePanel() { els.ov.classList.remove('open'); els.card.innerHTML = ''; if (tab === 'help') tab = 'ach'; if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) {} } if (cfg && typeof cfg.onPanel === 'function') { try { cfg.onPanel(false); } catch (e) {} } }
+
+  function renderPanel() {
+    var lv = levelFor(profile.xp), got = myAch(), list = cfg.achievements || [];
+    var nGot = list.filter(function (a) { return got[a.id]; }).length;
+    var h = '<h2><span>' + esc(cfg.name) + '</span><button id="tp-x" aria-label="Fechar">✕</button></h2>' +
+      (cfg.noStreak ? '<p class="sub">Só diversão: sem pontos de retorno, sem sequência diária.</p>' : '<p class="sub">Nível ' + lv.level + ' no Fliperama · ' + profile.xp + ' XP · 🔥 ' + profile.streak + ' dia' + (profile.streak === 1 ? '' : 's') + ' seguidos</p>' +
+      '<div class="tp-bar" aria-hidden="true"><i style="width:' + Math.round(lv.into / lv.need * 100) + '%"></i></div>') +
+      '<div id="tp-tabs" role="tablist">' +
+      ['ach:🏆 Conquistas', 'som:🔊 Som', 'help:❓ Como jogar'].map(function (s) { var p = s.split(':'); return '<button role="tab" data-t="' + p[0] + '" aria-selected="' + (tab === p[0]) + '">' + p[1] + '</button>'; }).join('') + '</div>';
+    if (tab === 'ach') {
+      h += '<p class="sub">' + nGot + ' de ' + list.length + ' desbloqueadas neste jogo</p>';
+      list.forEach(function (a) { var g = got[a.id]; h += '<div class="tp-ach ' + (g ? 'got' : 'lock') + '"><div class="ic">' + (g ? a.icon : '🔒') + '</div><div><b>' + esc(a.name) + '</b><span>' + esc(a.desc) + '</span></div></div>'; });
+      var tot = 0, totAll = 0; Object.keys(profile.ach).forEach(function (k) { tot += Object.keys(profile.ach[k]).length; });
+      h += '<p class="sub" style="margin-top:10px">Total no Fliperama: ' + tot + ' conquistas em todos os jogos.</p>';
+    } else if (tab === 'som') {
+      h += (cfg.music ? '<div class="tp-row"><span>🎵 Música</span><button class="tp-sw" role="switch" data-k="music" aria-label="Música" aria-checked="' + settings.music + '"></button></div>' : '') +
+        '<div class="tp-row"><span>🔊 Efeitos extras</span><button class="tp-sw" role="switch" data-k="sfx" aria-label="Efeitos extras" aria-checked="' + settings.sfx + '"></button></div>' +
+        '<div class="tp-row"><span>📳 Vibração (Android)</span><button class="tp-sw" role="switch" data-k="vibe" aria-label="Vibração" aria-checked="' + settings.vibe + '"></button></div>' +
+        '<div class="tp-row"><label for="tp-vol">Volume</label><input id="tp-vol" type="range" min="0" max="100" value="' + Math.round(settings.vol * 100) + '"></div>' +
+        '<p class="sub" style="margin-top:8px">A música é gerada pelo próprio jogo e para quando você troca de aba. O botão de som do jogo continua valendo para os efeitos dele.</p>';
+    } else {
+      h += '<div id="tp-help"></div>';
+    }
+    h += '<button class="tp-btn sec" id="tp-close2">Voltar ao jogo</button>';
+    els.card.innerHTML = h;
+    els.card.querySelector('#tp-x').onclick = closePanel; els.card.querySelector('#tp-close2').onclick = closePanel;
+    Array.prototype.forEach.call(els.card.querySelectorAll('#tp-tabs button'), function (b) { b.onclick = function () { tab = b.getAttribute('data-t'); renderPanel(); var f = els.card.querySelector('#tp-tabs button[aria-selected=true]'); if (f) f.focus(); }; });
+    Array.prototype.forEach.call(els.card.querySelectorAll('.tp-sw'), function (b) {
+      b.onclick = function () {
+        var k = b.getAttribute('data-k'); settings[k] = !settings[k]; saveSettings(); applyVol();
+        if (k === 'music') { settings.music ? Music.start() : Music.stop(); }
+        b.setAttribute('aria-checked', settings[k]); if (k === 'vibe' && settings.vibe) vibe(40);
+      };
+    });
+    var vol = els.card.querySelector('#tp-vol'); if (vol) vol.oninput = function () { settings.vol = vol.value / 100; saveSettings(); applyVol(); };
+    var hp = els.card.querySelector('#tp-help'); if (hp) renderSlides(hp, false);
+  }
+
+  /* ---------- tutorial ---------- */
+  function renderSlides(host, firstTime) {
+    var sl = cfg.tutorial || []; if (!sl.length) { host.innerHTML = '<p class="sub">Sem tutorial.</p>'; return; }
+    var i = 0;
+    function draw() {
+      var s = sl[i];
+      host.innerHTML = '<div class="tp-slide"><div class="big" aria-hidden="true">' + s.icon + '</div><h3>' + esc(s.title) + '</h3><p>' + esc(s.text) + '</p></div>' +
+        '<div class="tp-dots" aria-hidden="true">' + sl.map(function (_, k) { return '<i class="' + (k === i ? 'on' : '') + '"></i>'; }).join('') + '</div>' +
+        '<div style="display:flex;gap:8px"><button class="tp-btn sec" id="tp-prev" ' + (i === 0 ? 'disabled style="opacity:.4"' : '') + '>◀ Voltar</button><button class="tp-btn" id="tp-next">' + (i === sl.length - 1 ? (firstTime ? 'Bora jogar!' : 'Entendi') : 'Próximo ▶') + '</button></div>';
+      host.querySelector('#tp-prev').onclick = function () { if (i > 0) { i--; draw(); } };
+      host.querySelector('#tp-next').onclick = function () { if (i < sl.length - 1) { i++; draw(); } else { LS.set('tp_tut_' + cfg.id, '1'); if (firstTime) closePanel(); else { tab = 'ach'; renderPanel(); } } };
+    }
+    draw();
+  }
+  function showTutorial() {
+    buildUI(); lastFocus = document.activeElement; tab = 'help';
+    els.card.innerHTML = '<h2><span>Como jogar — ' + esc(cfg.name) + '</span><button id="tp-x" aria-label="Fechar">✕</button></h2><p class="sub">Leva 20 segundos.</p><div id="tp-help"></div>';
+    els.ov.classList.add('open'); els.card.querySelector('#tp-x').onclick = function () { LS.set('tp_tut_' + cfg.id, '1'); closePanel(); };
+    renderSlides(els.card.querySelector('#tp-help'), true);
+    if (typeof cfg.onPanel === 'function') { try { cfg.onPanel(true); } catch (e) {} }
+  }
+
+  /* ---------- conquistas, XP, sequência ---------- */
+  function toast(icon, small, title) {
+    buildUI();
+    var t = el('div', { class: 'tp-toast', role: 'status' }, '<div class="ic">' + icon + '</div><div><small>' + esc(small) + '</small>' + esc(title) + '</div>');
+    toastBox.appendChild(t);
+    setTimeout(function () { t.classList.add('out'); setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 450); }, 3200);
+    while (toastBox.children.length > 3) toastBox.removeChild(toastBox.firstChild);
+  }
+  function addXP(n, why) {
+    if (!n) return; var before = levelFor(profile.xp).level; profile.xp += n; saveProfile();
+    var after = levelFor(profile.xp).level;
+    if (after > before) { sfx('level'); vibe([30, 40, 30]); toast('⭐', 'Subiu de nível', 'Você chegou ao nível ' + after + ' do Fliperama!'); }
+  }
+  function unlock(id, silent) {
+    if (!cfg) return false; var got = myAch(); if (got[id]) return false;
+    var a = (cfg.achievements || []).filter(function (x) { return x.id === id; })[0]; if (!a) return false;
+    got[id] = Date.now(); saveProfile(); if (silent) return true; pending++; buildUI(); refreshBadge();
+    toast(a.icon, 'Conquista desbloqueada', a.name); sfx('ach'); vibe([20, 30, 20]); addXP(a.xp == null ? 25 : a.xp);
+    return true;
+  }
+  function stat(k, inc) { var g = (profile.games[cfg.id] = profile.games[cfg.id] || {}); g[k] = (g[k] || 0) + (inc == null ? 1 : inc); saveProfile(); return g[k]; }
+  function statGet(k) { var g = profile.games[cfg.id] || {}; return g[k] || 0; }
+  function statMax(k, v) { var g = (profile.games[cfg.id] = profile.games[cfg.id] || {}); if (v > (g[k] || 0)) { g[k] = v; saveProfile(); } return g[k] || 0; }
+
+  function touchDay() {
+    if (cfg && cfg.noStreak) return;
+    var today = dayKey();
+    if (profile.last === today) return;
+    var y = new Date(); y.setDate(y.getDate() - 1);
+    profile.streak = (profile.last === dayKey(y)) ? profile.streak + 1 : 1;
+    if (profile.streak > profile.best) profile.best = profile.streak;
+    profile.last = today; saveProfile();
+    if (profile.streak > 1) setTimeout(function () { toast('🔥', 'Sequência diária', profile.streak + ' dias seguidos no Fliperama!'); addXP(10 * Math.min(profile.streak, 7)); }, 1500);
+    else addXP(10);
+  }
+
+  /* ---------- efeitos visuais ---------- */
+  function floatText(text, x, y, color) {
+    if (REDUCE) return; var f = el('div', { class: 'tp-float', 'aria-hidden': 'true' }, esc(text));
+    f.style.left = (x == null ? innerWidth / 2 : x) + 'px'; f.style.top = (y == null ? innerHeight / 2 : y) + 'px'; if (color) f.style.color = color;
+    document.body.appendChild(f); setTimeout(function () { if (f.parentNode) f.parentNode.removeChild(f); }, 1050);
+  }
+  var cv = null, cx = null, parts = [], raf = 0;
+  function confetti(n, ox, oy) {
+    if (REDUCE) return;
+    if (!cv) { cv = el('canvas', { 'aria-hidden': 'true' }); cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2147483040'; document.body.appendChild(cv); cx = cv.getContext('2d'); }
+    cv.width = innerWidth; cv.height = innerHeight;
+    var cols = ['#ffd54a', '#ff3d71', '#3dd6ff', '#7dff6a', '#c77dff', '#ffffff'];
+    var x0 = ox == null ? innerWidth / 2 : ox, y0 = oy == null ? innerHeight * .55 : oy;
+    for (var i = 0; i < (n || 90); i++) { var a = Math.random() * Math.PI * 2, s = 4 + Math.random() * 9; parts.push({ x: x0, y: y0, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 5, r: 3 + Math.random() * 4, c: cols[i % cols.length], l: 70 + Math.random() * 40, rot: Math.random() * 6 }); }
+    if (!raf) raf = requestAnimationFrame(loop);
+  }
+  function loop() {
+    cx.clearRect(0, 0, cv.width, cv.height);
+    parts = parts.filter(function (p) { return p.l > 0; });
+    parts.forEach(function (p) { p.x += p.vx; p.y += p.vy; p.vy += .35; p.vx *= .99; p.l--; p.rot += .2; cx.globalAlpha = Math.min(1, p.l / 30); cx.fillStyle = p.c; cx.save(); cx.translate(p.x, p.y); cx.rotate(p.rot); cx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); cx.restore(); });
+    cx.globalAlpha = 1;
+    if (parts.length) raf = requestAnimationFrame(loop); else { raf = 0; cx.clearRect(0, 0, cv.width, cv.height); }
+  }
+  function shake(node, ms) {
+    if (REDUCE || !node || !node.animate) return;
+    node.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-6px,3px)' }, { transform: 'translate(5px,-3px)' }, { transform: 'translate(-3px,2px)' }, { transform: 'translate(0,0)' }], { duration: ms || 280 });
+  }
+
+  /* ---------- ciclo de vida ---------- */
+  function gesture() { ensureAudio(); if (settings.music) Music.start(); }
+  function init(c) {
+    cfg = c; if (c.music) mus.style = STYLES[c.music] || STYLES.arcade;
+    function go() {
+      buildUI(); touchDay();
+      var gs = (profile.games[cfg.id] = profile.games[cfg.id] || {}); gs.visitas = (gs.visitas || 0) + 1; saveProfile();
+      ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, function once() { window.removeEventListener(ev, once, true); gesture(); }, true); });
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) { Music.stop(); if (ctx && ctx.state === 'running') { try { ctx.suspend(); } catch (e) {} } }
+        else { if (ctx) { try { ctx.resume(); } catch (e) {} } if (settings.music && mus.style && started) Music.start(); }
+      });
+      if (!LS.get('tp_tut_' + cfg.id) && (cfg.tutorial || []).length && cfg.tutorialAuto !== false) setTimeout(showTutorial, cfg.tutorialDelay || 1200);
+      if (typeof cfg.onReady === 'function') { try { cfg.onReady(); } catch (e) {} }
+    }
+    var started = false; window.addEventListener('pointerdown', function () { started = true; }, true); window.addEventListener('keydown', function () { started = true; }, true);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+  }
+
+  window.TP = {
+    init: init, unlock: unlock, stat: stat, statGet: statGet, statMax: statMax, xp: addXP, toast: toast,
+    sfx: sfx, vibe: vibe, music: Music, confetti: confetti, float: floatText, shake: shake,
+    mute: function (v) { gameMuted = !!v; applyVol(); }, open: openPanel, tutorial: function () { if (!LS.get('tp_tut_' + cfg.id)) showTutorial(); }, tutorialForce: showTutorial, day: dayKey, reduce: REDUCE,
+    got: function (id) { return !!(cfg && myAch()[id]); },
+    count: function () { return Object.keys(myAch()).length; },
+    profile: function () { return profile; }
+  };
+})();
+
+</script>
+<script>
+(function () {
+  if (!window.TP) return;
+  TP.init({
+    id: 'sudoku', name: 'Sudoku Cyberpunk', music: 'chill',
+    achievements: [
+      { id: 'primeira', icon: '🧩', name: 'Primeira grade', desc: 'Complete um Sudoku.' },
+      { id: 'limpo', icon: '✨', name: 'Mão limpa', desc: 'Vença sem cometer nenhum erro.' },
+      { id: 'sem_dica', icon: '🧠', name: 'Cabeça fria', desc: 'Vença no Médio ou acima sem usar dicas.' },
+      { id: 'relampago', icon: '⚡', name: 'Relâmpago', desc: 'Vença no Médio ou acima em menos de 6 minutos.' },
+      { id: 'expert', icon: '👑', name: 'Mestre Expert', desc: 'Vença uma grade Expert.' },
+      { id: 'perfeito', icon: '💎', name: 'Perfeição', desc: 'Vença o Difícil ou Expert sem erros e sem dicas.' },
+      { id: 'diario', icon: '📅', name: 'Desafio do dia', desc: 'Complete o desafio diário.' },
+      { id: 'seq3', icon: '🔥', name: 'Três dias seguidos', desc: 'Complete o desafio do dia 3 dias seguidos.' },
+      { id: 'vet10', icon: '🎖️', name: 'Veterano', desc: 'Vença 10 partidas.' },
+      { id: 'vet30', icon: '🏅', name: 'Lenda da grade', desc: 'Vença 30 partidas.' }
+    ],
+    tutorial: [
+      { icon: '🔢', title: 'Preencha de 1 a 9', text: 'Cada linha, cada coluna e cada quadrado 3×3 precisa ter os números de 1 a 9, sem repetir.' },
+      { icon: '👆', title: 'Toque e escolha', text: 'Toque numa casa vazia e depois no número. Use o lápis para anotar candidatos sem se comprometer.' },
+      { icon: '❤️', title: 'Três erros e acabou', text: 'Você tem 3 dicas por partida. O Desafio do dia dá a mesma grade para todo mundo — compare com amigos!' }
+    ]
+  });
+  function box(i) { return Math.floor(i / 27) * 3 + Math.floor((i % 9) / 3); }
+  window.TPS = {
+    fill: function (grid, sol, idx) {
+      TP.vibe(8);
+      var r = Math.floor(idx / 9), c = idx % 9, b = box(idx), rowOk = true, colOk = true, boxOk = true;
+      for (var k = 0; k < 9; k++) {
+        if (grid[r * 9 + k] !== sol[r * 9 + k]) rowOk = false;
+        if (grid[k * 9 + c] !== sol[k * 9 + c]) colOk = false;
+        var br = Math.floor(b / 3) * 3 + Math.floor(k / 3), bc = (b % 3) * 3 + (k % 3);
+        if (grid[br * 9 + bc] !== sol[br * 9 + bc]) boxOk = false;
+      }
+      var n = (rowOk ? 1 : 0) + (colOk ? 1 : 0) + (boxOk ? 1 : 0);
+      if (n) {
+        var cell = document.getElementById('sudoku-grid') && document.getElementById('sudoku-grid').children[idx], rc = cell ? cell.getBoundingClientRect() : null;
+        TP.float(n > 1 ? 'Combo x' + n + '!' : (rowOk ? 'Linha completa!' : colOk ? 'Coluna completa!' : 'Quadrado completo!'), rc ? rc.left + rc.width / 2 : null, rc ? rc.top : null);
+        TP.sfx('coin'); TP.vibe([15, 20, 15]); TP.xp(2 * n);
+      }
+    },
+    wrong: function (gridEl) { TP.vibe(60); TP.shake(gridEl, 260); },
+    hint: function () { TP.vibe(10); },
+    lose: function () { TP.sfx('lose'); TP.vibe([80, 40, 80]); TP.stat('derrotas'); },
+    win: function (r) {
+      var n = TP.stat('vitorias'); TP.sfx('win'); TP.confetti(120); TP.vibe([30, 40, 30, 40, 80]);
+      var mult = { easy: 1, medium: 2, hard: 3, expert: 4 }[r.diff] || 1; TP.xp(15 * mult + (r.mistakes === 0 ? 10 : 0));
+      TP.unlock('primeira');
+      if (r.mistakes === 0) TP.unlock('limpo');
+      if (r.hints === 0 && r.diff !== 'easy') TP.unlock('sem_dica');
+      if (r.time < 360 && r.diff !== 'easy') TP.unlock('relampago');
+      if (r.diff === 'expert') TP.unlock('expert');
+      if (r.mistakes === 0 && r.hints === 0 && (r.diff === 'hard' || r.diff === 'expert')) TP.unlock('perfeito');
+      if (r.daily) { TP.unlock('diario'); if (r.streak >= 3) TP.unlock('seq3'); }
+      if (n >= 10) TP.unlock('vet10'); if (n >= 30) TP.unlock('vet30');
+    }
+  };
+})();
+
+</script>
+<!--TP-END-->
 </body>
 </html>
